@@ -1,0 +1,61 @@
+name: BigQuery operations
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Operation (deploy is first-time installation only)
+        required: true
+        type: choice
+        default: verify
+        options: [verify, deploy, refresh, export, benchmark, recovery-drill]
+  schedule:
+    - cron: '17 12 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: commerce-warehouse-${{ vars.BQ_PROJECT_ID }}-${{ vars.BQ_DATASET }}
+  cancel-in-progress: false
+jobs:
+  warehouse:
+    if: github.event_name == 'workflow_dispatch' || vars.COMMERCE_SCHEDULE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: commerce-cloud
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BQ_PROJECT_ID: ${{ vars.BQ_PROJECT_ID }}
+      BQ_DATASET: ${{ vars.BQ_DATASET }}
+      BQ_MAX_BYTES: ${{ vars.BQ_MAX_BYTES }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+      SERVICE_ACCOUNT: ${{ vars.SERVICE_ACCOUNT }}
+      COMMERCE_MODE: ${{ inputs.mode || 'refresh' }}
+      COMMERCE_OUTPUT_DIR: ${{ runner.temp }}/commerce-results
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate cloud configuration
+        shell: bash
+        run: |
+          : "${BQ_PROJECT_ID:?Set BQ_PROJECT_ID}"
+          : "${WORKLOAD_IDENTITY_PROVIDER:?Set WORKLOAD_IDENTITY_PROVIDER}"
+          : "${SERVICE_ACCOUNT:?Set SERVICE_ACCOUNT}"
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Execute warehouse operation
+        shell: bash
+        run: bash ops/commerce.sh "$COMMERCE_MODE"
+      - name: Retain aggregate execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commerce-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/commerce-results
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Report failed operation
+        if: failure()
+        run: echo '::error::Warehouse operation failed. Downstream steps were stopped; inspect the failed job before retrying.'

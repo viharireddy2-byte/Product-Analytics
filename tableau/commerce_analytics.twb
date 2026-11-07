@@ -1,0 +1,461 @@
+<?xml version='1.0' encoding='utf-8'?>
+<workbook source-platform="win" version="18.1">
+  <preferences />
+  <datasources>
+    <datasource caption="Daily" inline="true" name="daily" version="18.1">
+      <connection class="textscan" directory="data" filename="dashboard_daily.csv" password="" server="">
+        <relation name="daily" table="[dashboard_daily#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator="," text-qualifier="&quot;">
+            <column datatype="date" name="session_date" ordinal="0" />
+            <column datatype="string" name="device_type" ordinal="1" />
+            <column datatype="string" name="traffic_medium" ordinal="2" />
+            <column datatype="integer" name="sessions" ordinal="3" />
+            <column datatype="integer" name="product_views" ordinal="4" />
+            <column datatype="integer" name="carts" ordinal="5" />
+            <column datatype="integer" name="purchases" ordinal="6" />
+            <column datatype="integer" name="unordered_purchases" ordinal="7" />
+            <column datatype="datetime" name="published_at" ordinal="8" />
+          </columns>
+        </relation>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="Session Date" datatype="date" name="[session_date]" role="dimension" type="ordinal" />
+      <column caption="Device Type" datatype="string" name="[device_type]" role="dimension" type="nominal" />
+      <column caption="Traffic Medium" datatype="string" name="[traffic_medium]" role="dimension" type="nominal" />
+      <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" default-format="n#,##0" />
+      <column caption="Product Views" datatype="integer" name="[product_views]" role="measure" type="quantitative" default-format="n#,##0" />
+      <column caption="Carts" datatype="integer" name="[carts]" role="measure" type="quantitative" default-format="n#,##0" />
+      <column caption="Purchases" datatype="integer" name="[purchases]" role="measure" type="quantitative" default-format="n#,##0" />
+      <column caption="Unordered Purchases" datatype="integer" name="[unordered_purchases]" role="measure" type="quantitative" />
+      <column caption="Published At" datatype="datetime" name="[published_at]" role="dimension" type="ordinal" />
+      <column caption="Conversion Rate" datatype="real" default-format="p0.00%" name="[conversion_rate]" role="measure" type="quantitative">
+        <calculation class="tableau" formula="IF SUM([sessions]) &gt; 0 THEN SUM([purchases]) / SUM([sessions]) END" />
+      </column>
+    </datasource>
+    <datasource caption="Funnel" inline="true" name="funnel" version="18.1">
+      <connection class="textscan" directory="data" filename="funnel.csv" password="" server="">
+        <relation name="funnel" table="[funnel#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator="," text-qualifier="&quot;">
+            <column datatype="integer" name="ordinal" ordinal="0" />
+            <column datatype="string" name="stage" ordinal="1" />
+            <column datatype="integer" name="sessions" ordinal="2" />
+          </columns>
+        </relation>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="Ordinal" datatype="integer" name="[ordinal]" role="dimension" type="ordinal" />
+      <column caption="Stage" datatype="string" name="[stage]" role="dimension" type="nominal" />
+      <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" />
+    </datasource>
+    <datasource caption="Retention" inline="true" name="retention" version="18.1">
+      <connection class="textscan" directory="data" filename="retention.csv" password="" server="">
+        <relation name="retention" table="[retention#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator="," text-qualifier="&quot;">
+            <column datatype="integer" name="month_number" ordinal="0" />
+            <column datatype="integer" name="active_users" ordinal="1" />
+            <column datatype="integer" name="cohort_size" ordinal="2" />
+            <column datatype="real" name="retention_rate" ordinal="3" />
+            <column datatype="boolean" name="is_partial_month" ordinal="4" />
+          </columns>
+        </relation>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="Month Number" datatype="integer" name="[month_number]" role="dimension" type="ordinal" />
+      <column caption="Active Users" datatype="integer" name="[active_users]" role="measure" type="quantitative" />
+      <column caption="Cohort Size" datatype="integer" name="[cohort_size]" role="measure" type="quantitative" />
+      <column caption="Retention Rate" datatype="real" name="[retention_rate]" role="measure" type="quantitative" default-format="p0.00%" />
+      <column caption="Is Partial Month" datatype="boolean" name="[is_partial_month]" role="dimension" type="nominal" />
+    </datasource>
+  </datasources>
+  <worksheets>
+    <worksheet name="Sessions — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Sessions — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[sessions]" derivation="Sum" name="[sum:sessions:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Text" />
+            <encodings>
+              <text column="[daily].[sum:sessions:qk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+      </table>
+      <simple-id uuid="{84df12f4-2d64-569a-b834-cd68d8907f01}" />
+    </worksheet>
+    <worksheet name="Product views — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Product views — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Product Views" datatype="integer" name="[product_views]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[product_views]" derivation="Sum" name="[sum:product_views:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Text" />
+            <encodings>
+              <text column="[daily].[sum:product_views:qk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+      </table>
+      <simple-id uuid="{90b411a3-1c96-5320-8137-5d4d11e6120d}" />
+    </worksheet>
+    <worksheet name="Carts — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Carts — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Carts" datatype="integer" name="[carts]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[carts]" derivation="Sum" name="[sum:carts:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Text" />
+            <encodings>
+              <text column="[daily].[sum:carts:qk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+      </table>
+      <simple-id uuid="{60086b42-e228-5457-b1b2-1317b3c2170b}" />
+    </worksheet>
+    <worksheet name="Purchases — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Purchases — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Purchases" datatype="integer" name="[purchases]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[purchases]" derivation="Sum" name="[sum:purchases:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Text" />
+            <encodings>
+              <text column="[daily].[sum:purchases:qk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+      </table>
+      <simple-id uuid="{a96c454b-65ea-59bc-b64f-05fa54b86b5c}" />
+    </worksheet>
+    <worksheet name="Daily conversion — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Daily conversion — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Conversion Rate" datatype="real" default-format="p0.00%" name="[conversion_rate]" role="measure" type="quantitative">
+              <calculation class="tableau" formula="IF SUM([sessions]) &gt; 0 THEN SUM([purchases]) / SUM([sessions]) END" />
+            </column>
+            <column caption="Session Date" datatype="date" name="[session_date]" role="dimension" type="ordinal" />
+            <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column caption="Purchases" datatype="integer" name="[purchases]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[conversion_rate]" derivation="User" name="[usr:conversion_rate:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[session_date]" derivation="None" name="[none:session_date:ok]" pivot="key" type="ordinal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Line" />
+            <encodings />
+          </pane>
+        </panes>
+        <rows>[daily].[usr:conversion_rate:qk]</rows>
+        <cols>[daily].[none:session_date:ok]</cols>
+      </table>
+      <simple-id uuid="{178e0c63-cf8b-5d79-aaa7-fd0df43fd0f4}" />
+    </worksheet>
+    <worksheet name="Conversion by device — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Conversion by device — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Conversion Rate" datatype="real" default-format="p0.00%" name="[conversion_rate]" role="measure" type="quantitative">
+              <calculation class="tableau" formula="IF SUM([sessions]) &gt; 0 THEN SUM([purchases]) / SUM([sessions]) END" />
+            </column>
+            <column caption="Device Type" datatype="string" name="[device_type]" role="dimension" type="nominal" />
+            <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column caption="Purchases" datatype="integer" name="[purchases]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[conversion_rate]" derivation="User" name="[usr:conversion_rate:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[device_type]" derivation="None" name="[none:device_type:nk]" pivot="key" type="nominal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Bar" />
+            <encodings />
+          </pane>
+        </panes>
+        <rows>[daily].[none:device_type:nk]</rows>
+        <cols>[daily].[usr:conversion_rate:qk]</cols>
+      </table>
+      <simple-id uuid="{d179c434-c298-5915-bace-4bc5bd861e66}" />
+    </worksheet>
+    <worksheet name="Conversion by medium — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Conversion by medium — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Daily" name="daily" />
+          </datasources>
+          <datasource-dependencies datasource="daily">
+            <column caption="Conversion Rate" datatype="real" default-format="p0.00%" name="[conversion_rate]" role="measure" type="quantitative">
+              <calculation class="tableau" formula="IF SUM([sessions]) &gt; 0 THEN SUM([purchases]) / SUM([sessions]) END" />
+            </column>
+            <column caption="Traffic Medium" datatype="string" name="[traffic_medium]" role="dimension" type="nominal" />
+            <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column caption="Purchases" datatype="integer" name="[purchases]" role="measure" type="quantitative" default-format="n#,##0" />
+            <column-instance column="[conversion_rate]" derivation="User" name="[usr:conversion_rate:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[traffic_medium]" derivation="None" name="[none:traffic_medium:nk]" pivot="key" type="nominal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Bar" />
+            <encodings />
+          </pane>
+        </panes>
+        <rows>[daily].[none:traffic_medium:nk]</rows>
+        <cols>[daily].[usr:conversion_rate:qk]</cols>
+      </table>
+      <simple-id uuid="{db8cc6a2-b441-576e-ae87-e6549e43096f}" />
+    </worksheet>
+    <worksheet name="Ordered funnel — full sample">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">Ordered funnel — full sample</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Funnel" name="funnel" />
+          </datasources>
+          <datasource-dependencies datasource="funnel">
+            <column caption="Sessions" datatype="integer" name="[sessions]" role="measure" type="quantitative" />
+            <column caption="Stage" datatype="string" name="[stage]" role="dimension" type="nominal" />
+            <column-instance column="[sessions]" derivation="Sum" name="[sum:sessions:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[stage]" derivation="None" name="[none:stage:nk]" pivot="key" type="nominal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Bar" />
+            <encodings />
+          </pane>
+        </panes>
+        <rows>[funnel].[none:stage:nk]</rows>
+        <cols>[funnel].[sum:sessions:qk]</cols>
+      </table>
+      <simple-id uuid="{ee15a0fc-2420-54f2-a271-e002e347a468}" />
+    </worksheet>
+    <worksheet name="January 2017 cohort — January to June">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontname="Arial" fontsize="12">January 2017 cohort — January to June</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="Retention" name="retention" />
+          </datasources>
+          <datasource-dependencies datasource="retention">
+            <column caption="Retention Rate" datatype="real" name="[retention_rate]" role="measure" type="quantitative" default-format="p0.00%" />
+            <column caption="Month Number" datatype="integer" name="[month_number]" role="dimension" type="ordinal" />
+            <column-instance column="[retention_rate]" derivation="Avg" name="[avg:retention_rate:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[month_number]" derivation="None" name="[none:month_number:ok]" pivot="key" type="ordinal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Line" />
+            <encodings />
+          </pane>
+        </panes>
+        <rows>[retention].[avg:retention_rate:qk]</rows>
+        <cols>[retention].[none:month_number:ok]</cols>
+      </table>
+      <simple-id uuid="{af5b89fb-e9e4-58e4-aa0d-95c34fc5c29f}" />
+    </worksheet>
+  </worksheets>
+  <dashboards>
+    <dashboard name="Product Analytics">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run bold="true" fontsize="20">Product Analytics</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <size sizing-mode="fixed" maxheight="1000" maxwidth="1440" minheight="1000" minwidth="1440" />
+      <zones>
+        <zone h="14000" id="1" name="Sessions — full sample" w="25000" x="0" y="0" />
+        <zone h="14000" id="2" name="Product views — full sample" w="25000" x="25000" y="0" />
+        <zone h="14000" id="3" name="Carts — full sample" w="25000" x="50000" y="0" />
+        <zone h="14000" id="4" name="Purchases — full sample" w="25000" x="75000" y="0" />
+        <zone h="27000" id="5" name="Daily conversion — full sample" w="100000" x="0" y="14000" />
+        <zone h="27000" id="6" name="Conversion by device — full sample" w="50000" x="0" y="41000" />
+        <zone h="27000" id="7" name="Conversion by medium — full sample" w="50000" x="50000" y="41000" />
+        <zone h="32000" id="8" name="Ordered funnel — full sample" w="50000" x="0" y="68000" />
+        <zone h="32000" id="9" name="January 2017 cohort — January to June" w="50000" x="50000" y="68000" />
+      </zones>
+    </dashboard>
+  </dashboards>
+  <windows>
+    <window class="worksheet" name="Sessions — full sample">
+      <viewpoints />
+      <simple-id uuid="{4ffe1012-acae-53e5-b47f-7dc6dac81156}" />
+    </window>
+    <window class="worksheet" name="Product views — full sample">
+      <viewpoints />
+      <simple-id uuid="{8c29ca4d-2eec-5d18-bfb3-6d839a0bdc36}" />
+    </window>
+    <window class="worksheet" name="Carts — full sample">
+      <viewpoints />
+      <simple-id uuid="{df45fbca-2d57-54c6-8679-58047baef44b}" />
+    </window>
+    <window class="worksheet" name="Purchases — full sample">
+      <viewpoints />
+      <simple-id uuid="{a9f738f3-e695-581e-a86c-6302c0d33862}" />
+    </window>
+    <window class="worksheet" name="Daily conversion — full sample">
+      <viewpoints />
+      <simple-id uuid="{482d659f-cf30-5692-a105-f8840e05c0f1}" />
+    </window>
+    <window class="worksheet" name="Conversion by device — full sample">
+      <viewpoints />
+      <simple-id uuid="{97edce35-1282-5827-9bda-a6f98bec1787}" />
+    </window>
+    <window class="worksheet" name="Conversion by medium — full sample">
+      <viewpoints />
+      <simple-id uuid="{3bec6c8d-9945-5510-9a86-89a18b588fab}" />
+    </window>
+    <window class="worksheet" name="Ordered funnel — full sample">
+      <viewpoints />
+      <simple-id uuid="{f9315cb7-cbdc-5021-8add-a59887d1f7d2}" />
+    </window>
+    <window class="worksheet" name="January 2017 cohort — January to June">
+      <viewpoints />
+      <simple-id uuid="{49433e08-cf6c-59ca-b0b5-eea383b57b1f}" />
+    </window>
+    <window class="dashboard" name="Product Analytics" />
+  </windows>
+</workbook>
