@@ -31,7 +31,7 @@ jobs:
       WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
       SERVICE_ACCOUNT: ${{ vars.SERVICE_ACCOUNT }}
       COMMERCE_MODE: ${{ inputs.mode || 'refresh' }}
-      COMMERCE_OUTPUT_DIR: ${{ runner.temp }}/commerce-results
+      COMMERCE_OUTPUT_DIR: ${{ github.workspace }}/artifacts/cloud-results
     steps:
       - uses: actions/checkout@v4
       - name: Validate cloud configuration
@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: commerce-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/commerce-results
+          path: ${{ github.workspace }}/artifacts/cloud-results
           if-no-files-found: ignore
           retention-days: 14
       - name: Report failed operation
