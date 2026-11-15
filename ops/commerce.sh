@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 mode=${1:-verify}
-case "$mode" in verify|deploy|refresh|export|benchmark|recovery-drill) ;; *) echo "Unknown mode: $mode" >&2; exit 2;; esac
+case "$mode" in verify|deploy|refresh|export|benchmark|recovery-drill|scale-deploy) ;; *) echo "Unknown mode: $mode" >&2; exit 2;; esac
 : "${BQ_PROJECT_ID:?Set BQ_PROJECT_ID to your billing and data project}"
 BQ_DATASET=${BQ_DATASET:-commerce_analytics}
 BQ_MAX_BYTES=${BQ_MAX_BYTES:-50000000000}
@@ -70,7 +70,7 @@ export_dashboard() {
 case "$mode" in
  verify) query "$root/sql/14_regression_tests.sql" regression
  query "$root/sql/20_cohort_regression_tests.sql" cohort_regression;;
- deploy)
+ deploy|scale-deploy)
   query "$root/sql/14_regression_tests.sql" regression
   query "$root/sql/20_cohort_regression_tests.sql" cohort_regression
   # This optional entry point refuses to overwrite an existing mart; use refresh for updates.
@@ -83,7 +83,21 @@ case "$mode" in
    echo 'Mart already exists; use refresh. Existing SQL 00 remains available for explicit full rebuilds.' >&2
    exit 2
   fi
+  if [[ $mode == scale-deploy ]]; then
+   [[ $BQ_DATASET == *_scale ]] || { echo 'scale-deploy requires a dedicated dataset ending in _scale' >&2; exit 2; }
+   query "$root/sql/22_scale_source.sql" scale_source
+  else
+   query "$root/sql/21_public_source.sql" public_source
+  fi
   query "$root/sql/00_build_session_mart.sql" initial_build
+  if [[ $mode == scale-deploy ]]; then
+   inline_query scale_mart_gate <<SQL
+ASSERT (SELECT COUNT(*) FROM ${BQ_DATASET}.sessions
+ WHERE session_date BETWEEN DATE '2016-08-01' AND DATE '2017-08-01')=50000000
+ AS 'Scale mart must contain 50M sessions';
+SELECT 'synthetic' AS source_kind,50000000 AS validated_sessions;
+SQL
+  fi
   query "$root/sql/08_quality_checks.sql" quality
   query "$root/sql/11_validated_refresh.sql" install_refresh
   query "$root/sql/12_dashboard_publish.sql" dashboard_publish
@@ -92,7 +106,7 @@ case "$mode" in
   query "$root/sql/14_regression_tests.sql" regression
   query "$root/sql/20_cohort_regression_tests.sql" cohort_regression
   snapshot
-  # Fixed historical window: no claim of recent live source data.
+  # Refresh the configured historical January reporting window.
   inline_query refresh <<SQL
 CALL ${BQ_DATASET}.refresh_sessions(DATE '2017-01-01',DATE '2017-01-31');
 SQL
@@ -107,6 +121,14 @@ SQL
   bq --project_id="$BQ_PROJECT_ID" --location=US mk --dataset --default_table_expiration=86400 "$BQ_PROJECT_ID:$scratch_dataset"
   query "$root/sql/16_recovery_drill.sql" recovery_drill;;
  benchmark)
+  inline_query benchmark_scope <<SQL
+SELECT @@project_id AS project_id,'${BQ_DATASET}' AS dataset_id,
+ (SELECT COUNT(*) FROM ${BQ_DATASET}.raw_sessions
+ WHERE source_suffix BETWEEN '20160801' AND '20170801') AS source_sessions,
+ (SELECT COUNT(*) FROM ${BQ_DATASET}.sessions
+ WHERE session_date BETWEEN DATE '2016-08-01' AND DATE '2017-08-01') AS mart_sessions,
+ DATE '2017-01-01' AS reporting_start,DATE '2017-01-31' AS reporting_end;
+SQL
   jobs=()
   for ((i=1;i<=BENCHMARK_RUNS;i++)); do
    # Alternate order to reduce systematic warm-cache / load ordering bias.
@@ -154,6 +176,7 @@ WITH runs AS (
 )
 SELECT DISTINCT * FROM summary ORDER BY variant;
 SQL
+  python3 "$root/ops/benchmark_report.py" "$out"
  ;;
 esac
 printf 'Completed %s. Aggregate results and execution evidence: %s\n' "$mode" "$out"

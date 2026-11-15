@@ -7,8 +7,8 @@ WITH normalized AS (
  totals.transactions AS transactions,
  ARRAY(SELECT AS STRUCT h.hitNumber AS hit_number, h.time AS time_ms,
  h.eCommerceAction.action_type AS action_type FROM UNNEST(hits) h) AS events
- FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
- WHERE _TABLE_SUFFIX BETWEEN '20170101' AND '20170131'
+ FROM commerce_analytics.raw_sessions
+ WHERE source_suffix BETWEEN '20170101' AND '20170131'
 ), deduplicated AS (
  SELECT * FROM normalized
  QUALIFY ROW_NUMBER() OVER (PARTITION BY visitor_id, visit_id

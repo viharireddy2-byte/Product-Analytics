@@ -19,6 +19,7 @@ bash ops/commerce.sh deploy
 
 | Mode | Behavior |
 |---|---|
+| scale-deploy | Install a connected 50M-session synthetic source and mart in a dedicated `_scale` dataset; see [scale guide](scale.md) |
 | verify | Run self-contained funnel and retention regression fixtures in BigQuery |
 | deploy | Verify, create dataset if absent, build once, validate, install procedure, publish and export |
 | refresh | Verify, take a seven-day snapshot, refresh January partitions, validate, health-gate, publish and export |

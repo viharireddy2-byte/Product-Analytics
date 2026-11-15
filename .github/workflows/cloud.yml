@@ -7,7 +7,7 @@ on:
         required: true
         type: choice
         default: verify
-        options: [verify, deploy, refresh, export, benchmark, recovery-drill]
+        options: [verify, deploy, refresh, export, benchmark, recovery-drill, scale-deploy]
   schedule:
     - cron: '17 12 * * *'
 permissions:

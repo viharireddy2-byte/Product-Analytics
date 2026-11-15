@@ -14,3 +14,5 @@ jobs:
         run: bash -n ops/commerce.sh tests/operations_test.sh
       - name: Verify operational failure paths
         run: bash tests/operations_test.sh
+      - name: Verify benchmark evidence assessment
+        run: python3 -m unittest discover -s tests -p 'test_*.py'

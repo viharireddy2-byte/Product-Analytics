@@ -12,6 +12,8 @@ The full rebuild includes all available sample dates. For a live source, define 
 
 ## Reproducible capacity workload
 
+For a connected multi-day 50M-session pipeline, use [scale deployment](../ops/scale.md). The single-day utility below is a separate diagnostic workload.
+
 `09_scale_workload.sql` creates exactly `target_rows`, default 50,000,000, from one populated source day. Each replica receives a distinct visitor and session identity. Device and funnel distributions are copied, all rows retain the source date, and traffic is correlated. This tests row volume and cluster filtering on a single partition; it cannot demonstrate multi-day partition pruning, realistic cohort behavior, independent-user experiment power, or 50M real visitors.
 
 For a partition-pruning experiment use the real multi-day mart, with a bounded full-history control query and a single-day candidate using identical selected columns. Do not compare different date ranges as equivalent business results. For a repeated-dashboard experiment compare repeated raw-hit queries against the equivalent session mart aggregates, validating counts first. Report mart build cost separately and calculate the query count needed to amortize it.

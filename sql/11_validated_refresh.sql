@@ -20,8 +20,8 @@ WITH normalized AS (
  totals.transactions AS transactions,
  ARRAY(SELECT AS STRUCT h.hitNumber AS hit_number, h.time AS time_ms,
  h.eCommerceAction.action_type AS action_type FROM UNNEST(hits) h) AS events
- FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
- WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', refresh_start) AND FORMAT_DATE('%Y%m%d', refresh_end)
+ FROM commerce_analytics.raw_sessions
+ WHERE source_suffix BETWEEN FORMAT_DATE('%Y%m%d', refresh_start) AND FORMAT_DATE('%Y%m%d', refresh_end)
 ), deduplicated AS (
  SELECT * FROM normalized
  QUALIFY ROW_NUMBER() OVER (PARTITION BY visitor_id, visit_id

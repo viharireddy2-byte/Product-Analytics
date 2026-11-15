@@ -6,7 +6,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/repo/ops" "$tmp/repo/sql"
 # Test an isolated repository copy so export-mode tests cannot overwrite real extracts.
-cp "$root/ops/commerce.sh" "$tmp/repo/ops/"
+cp "$root/ops/commerce.sh" "$root/ops/benchmark_report.py" "$tmp/repo/ops/"
 cp -R "$root/sql/." "$tmp/repo/sql/"
 export PATH="$tmp/bin:$PATH" BQ_PROJECT_ID=commerce-test-project BQ_DATASET=commerce_test
 export BQ_MAX_BYTES=2000000000 COMMERCE_OUTPUT_DIR="$tmp/results" MOCK_LOG="$tmp/calls"
@@ -23,7 +23,12 @@ if [[ $args == *' query '* ]]; then
  sql=$(cat)
  printf '%s\n' "$sql" >> "$MOCK_LOG"
  if [[ -n ${MOCK_FAIL_ON:-} && $sql == *"$MOCK_FAIL_ON"* ]]; then exit 1; fi
- if [[ $args == *'bench_raw_'* && ${MOCK_MISMATCH:-false} == true ]]; then
+ if [[ $args == *'benchmark_evidence'* ]]; then
+  printf 'job_id,variant,execution_ms,cache_hit,error_reason\n'
+  for v in raw mart; do
+   for i in 1 2 3 4 5; do printf '%s_%s,%s,10000,false,\n' "$v" "$i" "$v"; done
+  done
+ elif [[ $args == *'bench_raw_'* && ${MOCK_MISMATCH:-false} == true ]]; then
   printf 'total_sessions,product_views,add_to_cart,purchases\n6,4,2,2\n'
  else
   printf 'total_sessions,product_views,add_to_cart,purchases\n5,4,2,2\n'
@@ -110,3 +115,16 @@ production_tail=$(sed -n '/), deduplicated AS (/,$p' "$root/sql/00_build_session
 fixture_tail=$(sed -n '/), deduplicated AS (/,$p' "$root/sql/14_regression_tests.sql" | sed '/^ASSERT/,$d')
 [[ $production_tail == "$fixture_tail" ]]
 echo 'PASS: funnel fixture transformation matches the production SQL'
+
+reset_log
+export BQ_DATASET=commerce_test_scale
+run scale-deploy
+grep -q 'Scale source must contain 50M sessions' "$MOCK_LOG"
+grep -q 'Scale mart must contain 50M sessions' "$MOCK_LOG"
+grep -q 'CREATE OR REPLACE VIEW commerce_test_scale.raw_sessions' "$MOCK_LOG"
+echo 'PASS: scale deployment connects raw source and validates mart cardinality'
+reset_log
+export BQ_DATASET=commerce_test
+if run scale-deploy; then echo 'Nonisolated scale deployment accepted' >&2; exit 1; fi
+! grep -q 'CREATE OR REPLACE TABLE commerce_test.raw_scale_sessions' "$MOCK_LOG"
+echo 'PASS: scale source cannot overwrite a non-scale dataset'

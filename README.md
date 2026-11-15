@@ -1,86 +1,74 @@
 # Product Analytics
 
-BigQuery SQL analytics for understanding where shoppers leave the purchase journey, which acquisition channels convert, and whether customers return. Amplitude supports event-level exploration; Tableau supports executive reporting. The warehouse remains the source of metric definitions.
+A SQL-first product analytics pipeline on BigQuery for ordered conversion funnels, cohort retention, and Tableau reporting.
 
-## Capabilities
+## Project objectives
 
-- Session and visitor counts using composite visitor/visit identities.
-- Strict product-view → add-to-cart → purchase funnels, with device and traffic-medium breakdowns.
-- First-observed monthly cohorts, retention rates, zero-filled months, and partial-period flags.
-- Mobile checkout baseline and two-proportion experiment inference with uncertainty intervals.
-- Partitioned, clustered session mart with repeatable rebuilds and SQL quality assertions.
-- Opt-in synthetic workload supporting exactly 50 million rows; query-job cost and latency inspection.
-
-## Stack and structure
-
-BigQuery Standard SQL, Google Analytics public session data, Amplitude, and Tableau. All analysis stays in SQL. Optional Bash/Google Cloud CLI tooling and GitHub Actions provide deployment operations; no application server or additional analytics runtime is introduced.
-
-```text
-sql/          numbered warehouse build, analysis, quality, and workload scripts
-memo/         metric contract, operating guide, analysis and performance methodology
-screenshots/  instructions for reproducible dashboard exports
-ops/          bounded cloud operations, snapshots and benchmark runner
-tests/        isolated operational failure-path tests
-tableau/      native Tableau workbook connected to aggregate exports
-.github/      local checks and optional authenticated cloud workflow
-```
+- Architect a BigQuery product analytics mart for **50M synthetic sessions**, using date partitioning and clustering to power conversion funnels, cohort retention, and Tableau reporting.
+- Target a **75% reduction in funnel query latency (20s to 5s)** by precomputing ordered event timestamps and querying partition-filtered session aggregates.
+- Engineer reliable refreshes with **six prepublication validation gates**, transactional partition replacement, snapshot recovery, and GitHub Actions automation to block invalid dashboard updates.
 
 ## Architecture
 
-Raw date-sharded Google Analytics sessions are normalized into `commerce_analytics.sessions`. Nested hits are processed within each session; deduplication produces one visitor/visit row. The table partitions by session date and clusters by device, medium, and visitor. Analysis scripts query this table with mandatory date filters. Tableau consumes query results; Amplitude consumes event exports with equivalent identity and funnel rules.
+Public Google Analytics sessions or a deterministic synthetic event source feed a shared `raw_sessions` adapter. The pipeline processes nested hits into one row per visitor and visit, precomputing ordered product-view, cart, and purchase timestamps. The session mart partitions by date and clusters by device, traffic medium, and visitor. Reporting queries require date filters.
 
-The build is a bounded full refresh, published through one `CREATE OR REPLACE TABLE` statement. The optional operations runner performs validated partition refreshes after initial installation, with pre-refresh snapshots and audit history. Candidate validation and transactional replacement protect the mart. A separate validated aggregate publication feeds Tableau. GitHub Actions can schedule the runner; manual SQL remains supported.
+Validated daily aggregates and CSV exports feed the included Tableau workbook. Amplitude event reconciliation is documented separately.
 
-## Deploy and run
+## Features
 
-1. Use a Google Cloud project with billing and BigQuery enabled. Create `commerce_analytics` in the **US** location, matching the public dataset. The executing identity needs query-job permission on the billing project and table read/write permission on the target dataset.
-2. In BigQuery Studio, select that project, use GoogleSQL, and execute `sql/00_build_session_mart.sql`.
-3. Execute `sql/08_quality_checks.sql`. Any failed assertion blocks dashboard publication.
-4. Run `01`–`06` for the January 2017 analysis. Date variables at the top of each script control the window. The sample covers August 2016 through August 1, 2017; do not interpret absent later data as zero traffic.
-5. Run `07` to inspect the illustrative experiment calculation. Replace demonstration counts only with validated randomized experiment aggregates.
-6. Connect Tableau to the query outputs, or save results as CSV and import extracts. Follow [visualization setup](screenshots/README.md) for dashboard definitions and Amplitude reconciliation.
+- Ordered conversion funnels with device and acquisition-medium breakdowns.
+- First-observed monthly cohorts, zero-filled retention periods, and partial-month flags.
+- Six candidate validation gates before transactional partition replacement.
+- Pre-refresh snapshots, audit history, freshness checks, and an isolated recovery drill.
+- GitHub Actions deployment and scheduled refresh workflows.
+- A synthetic scale workload with 50M sessions, 5M visitor identities, and 600M nested hits across 365 days.
+- Repeated raw-event versus session-mart benchmarks with output reconciliation and query-job metrics.
+- A native Tableau workbook with funnel KPIs, daily conversion, segment comparisons, and retention.
 
-Optional CLI setup and execution (Google Cloud CLI is an operator tool):
+## Quick start
+
+Requires Python 3, an authenticated Google Cloud CLI, a billing-enabled Google Cloud project, and permissions to create tables and run queries in a US-location dataset.
 
 ```bash
-bq --location=US mk --dataset commerce_analytics
-bq query --location=US --use_legacy_sql=false < sql/00_build_session_mart.sql
-bq query --location=US --use_legacy_sql=false < sql/08_quality_checks.sql
-bq query --location=US --use_legacy_sql=false < sql/02_full_funnel.sql
+export BQ_PROJECT_ID=your-project-id
+export BQ_DATASET=commerce_analytics
+bash ops/commerce.sh verify
+bash ops/commerce.sh deploy
+bash ops/commerce.sh refresh
+bash ops/commerce.sh benchmark
+bash ops/commerce.sh export
 ```
 
-Review query estimates and set job byte limits appropriate to your budget. Script estimates may not cover every statement. `09_scale_workload.sql` writes a large table and must be run explicitly. It is excluded from normal deployment. Delete `commerce_analytics.synthetic_sessions` after testing. Never publish visitor identifiers or row-level event exports to a public dashboard.
+`deploy` installs the public-sample source adapter and refuses to overwrite an existing mart. For direct SQL execution, create the dataset, run `sql/21_public_source.sql`, then scripts 00, 08, 11, and 12. Public source data spans August 2016 through August 1, 2017. The default refresh and benchmark window is January 2017.
 
-## Database and metric documentation
+For the connected 50M-session workload, follow [scale deployment](ops/scale.md) using a separate dataset ending in `_scale`.
 
-See [metric and table contracts](memo/data_contract.md), [analysis guide](memo/analysis.md), and [operations and benchmark guide](memo/operations.md). The SQL result sets are the integration interface; this project exposes no HTTP API.
+## Refresh reliability
 
-## Performance and scale
+The refresh procedure stages a candidate and validates nonempty data, unique session identity, complete identity, complete date coverage, cart order, and purchase order. A transaction replaces only the requested date partitions and writes the success audit record. Failed validation stops replacement. The runner takes a snapshot before refresh and gates dashboard publication on successful quality and freshness checks. Dashboard totals are reconciled before publication.
 
-The 50M-row workload is executable synthetic capacity testing, not a claim of 50M observed customer sessions. Production latency and cost depend on the actual project and reservation. No cloud execution measurements are claimed in this repository. The operating guide defines a reproducible measurement protocol; script 10 captures real job evidence.
+## Performance methodology
 
-## Engineering choices
+The benchmark runner alternates execution order for 5–20 raw/mart pairs, disables result caching, and requires matching funnel outputs. Artifacts include job IDs, reporting scope, execution time, bytes processed, slot time, median and p95 latency, and measured percentage reduction. The scale workload uses synthetic data. Runtime and cost depend on compute capacity and deployment configuration; benchmark results are generated by cloud execution and are not bundled.
 
-The SQL-first folder layout and BigQuery/Amplitude/Tableau approach remain intact. Added SQL modules introduce a reusable mart, ordered conversion semantics, quality gates, uncertainty estimates, and a scale harness. Ordered funnels intentionally differ from independent event-presence counts. Retention measures observed activity, not repeat purchases. Additional modules provide validated transactional partition refreshes, audit history, dashboard aggregate reconciliation, experiment allocation checks and executable regression fixtures. The repository includes optional scheduling, failure notifications, a snapshot recovery drill, a benchmark collector and a Tableau workbook. Cloud identity, access policy, workflow variables, live BI validation and measured execution evidence belong to the deployment environment.
+## Documentation
 
-## Operational modules
-
-| Script | Purpose |
+| Guide | Contents |
 |---|---|
-| 11 | Install validated partition-refresh procedure and audit table |
-| 12 | Validate and publish daily dashboard aggregates |
-| 13 | Experiment allocation check and approximate sample-size planning |
-| 14 | Self-contained SQL regression fixtures |
-| 15 | Refresh failure and processing-freshness health status |
+| [Operations](ops/README.md) | Deployment, scheduling, access, budgets, and recovery |
+| [Scale deployment](ops/scale.md) | Connected 50M-session source and benchmark artifacts |
+| [Data contract](memo/data_contract.md) | Table schemas, metric definitions, and output grain |
+| [Analysis](memo/analysis.md) | Interpretation of conversion, retention, and experiments |
+| [Methodology](memo/operations.md) | Verification, release checks, and benchmark design |
+| [Tableau](tableau/README.md) | Workbook setup and aggregate exports |
+| [Visualization setup](screenshots/README.md) | Tableau and Amplitude reconciliation |
+| [Tests](tests/README.md) | Local orchestration and authenticated SQL checks |
 
-Recommended release order: run 14, build with 00, validate with 08, install 11, publish with 12. Subsequent bounded refreshes use the procedure from 11, then 08 and 12. Run 15 to inspect refresh health after procedure calls. Script 00 remains the original full-refresh entry point and does not populate procedure audit history. See the operating guide for recovery and scheduler integration.
+## Tests
 
-Tableau can read `commerce_analytics.dashboard_daily` directly. Sum stage counts to compute conversion rates. `daily_visitors` is non-additive across dates and segments; use query 01 for distinct visitors over a reporting window. `published_at` records aggregate publication time. Amplitude setup remains documented in screenshots/README.md; no live workbook or account integration is claimed.
+```bash
+bash tests/operations_test.sh
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
 
-## Automated operations and dashboard
-
-See [operator setup](ops/README.md) for first-time installation, Workload Identity Federation, byte budgets, scheduling, alerts, recovery and repeated benchmarks. Start with `bash tests/operations_test.sh`; these tests use an isolated fake CLI and incur no cloud cost. The authenticated cloud workflow runs the actual SQL fixture suites. Existing SQL files can still be executed directly.
-
-[Open the Tableau workbook setup](tableau/README.md). The native workbook includes nine worksheets: four funnel KPI cards, daily conversion, device and medium conversion, a stage funnel, and January cohort retention. The export runner writes its aggregate data files; it does not publish a Tableau Public site automatically.
-
-SQL 16 performs the isolated snapshot recovery drill; 17 and 19 define Tableau exports; 18 is an executable freshness/failure gate; 20 adds retention regression cases. SQL under `sql/benchmarks/` provides equivalent raw-hit and mart queries over January 2017. No schedule, cloud deployment, benchmark outcome or Tableau rendering is represented as already verified without the corresponding account execution.
+Local tests cover CLI orchestration and benchmark calculations. BigQuery SQL integration tests run through `verify` with cloud credentials. Tableau rendering requires Tableau Desktop or Tableau Public.
